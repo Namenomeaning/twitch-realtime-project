@@ -1,0 +1,40 @@
+{
+    "namespace": "twitch_realtime_project.schemas",
+    "type": "record",
+    "name": "LolStream",
+    "fields": [
+        {"name": "id",             "type": "string"},
+        {"name": "user_id",        "type": "string"},
+        {"name": "user_login",     "type": "string"},
+        {"name": "user_name",      "type": "string"},
+        {"name": "game_id",        "type": "string"},
+        {"name": "game_name",      "type": "string"},
+        {"name": "type",           "type": "string"},
+        {"name": "title",          "type": "string"},
+        {"name": "viewer_count",   "type": "int"},
+        {
+            "name": "started_at",
+            "type": {
+                "type": "long",
+                "logicalType": "timestamp-millis"
+            }
+        },
+        {"name": "language",       "type": "string"},
+        {"name": "thumbnail_url",  "type": "string"},
+        {
+            "name": "tag_ids",
+            "type": {
+                "type": "array",
+                "items": "string"
+            }
+        },
+        {"name": "is_mature",      "type": "boolean"},
+        {
+            "name": "tags",
+            "type": {
+                "type": "array",
+                "items": "string"
+            }
+        }
+    ]
+}
