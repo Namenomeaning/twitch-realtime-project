@@ -42,7 +42,6 @@ The Grafana dashboard provides real-time insights into:
 - **Top Games by Viewer Count**: Most popular games currently being streamed
 - **Streaming Trends**: Viewer count patterns over time
 - **Broadcaster Analytics**: Stream duration, language distribution, mature content ratio
-- **Platform Metrics**: Data pipeline performance and health monitoring
 
 ## 🚀 Getting Started
 
@@ -86,19 +85,152 @@ The Grafana dashboard provides real-time insights into:
    pip install -e .
    ```
 
+### Database Setup
+
+5. **Create ClickHouse tables**:
+   
+   Access ClickHouse client:
+   ```bash
+   # Option 1: Using Docker
+   docker exec -it clickhouse clickhouse-client
+   
+   # Option 2: Using HTTP interface
+   curl -X POST 'http://localhost:8123/' --data-binary @src/database/game_streams_enriched.sql
+   ```
+   
+   Or create the table manually in ClickHouse:
+   ```sql
+   CREATE TABLE IF NOT EXISTS default.game_streams_enriched (
+       stream_id String,
+       user_id String,
+       user_login Nullable(String),
+       user_name Nullable(String),
+       game_id String,
+       game_name Nullable(String),
+       stream_type Nullable(String),
+       title Nullable(String),
+       viewer_count Nullable(UInt32),
+       started_at DateTime,
+       language Nullable(String),
+       is_mature Nullable(Bool),
+       tags Nullable(String),
+       broadcaster_type Nullable(String),
+       user_description Nullable(String),
+       user_created_at Nullable(DateTime),
+       data_retrieved_at DateTime
+   ) ENGINE = MergeTree
+   PARTITION BY (data_retrieved_at, game_id)
+   ORDER BY (stream_id, data_retrieved_at)
+   TTL toDateTime(started_at) + toIntervalDay(14);
+   ```
+
+### Pipeline Setup
+
+6. **Configure GlassFlow ETL Pipeline**:
+   
+   a. Access GlassFlow UI at http://localhost:8080
+   
+   b. Create a new pipeline with the following configuration:
+      - **Source 1**: Kafka topic `game_streams` (raw stream data)
+      - **Source 2**: Kafka topic `twitch_users` (user profile data)
+      - **Transformation**: Join streams and users data on `user_id`
+      - **Destination**: ClickHouse table `game_streams_enriched`
+   
+   c. Pipeline Configuration:
+   ```yaml
+   # Example GlassFlow pipeline configuration
+   sources:
+     - name: game_streams
+       type: kafka
+       topic: game_streams
+       bootstrap_servers: kafka1:19092
+     - name: twitch_users
+       type: kafka
+       topic: twitch_users
+       bootstrap_servers: kafka1:19092
+   
+   transformations:
+     - type: join
+       left: game_streams
+       right: twitch_users
+       on: user_id
+       type: left_join
+   
+   destination:
+     type: clickhouse
+     host: clickhouse
+     port: 9000
+     database: default
+     table: game_streams_enriched
+   ```
+   
+   📚 **For detailed GlassFlow step-by-step setup, see**: [docs/glassflow-setup.md](docs/glassflow-setup.md)
+   
+   📚 **For complete GlassFlow documentation, refer to**: https://github.com/glassflow/clickhouse-etl
+
 ### Running the Pipeline
 
-1. **Start data ingestion**:
+7. **Start data ingestion**:
    ```bash
    cd src/producer
    python streams_producer.py
    ```
 
-2. **Access the services**:
-   - **Grafana Dashboard**: http://localhost:3000 (admin/admin)
-   - **Kafka UI**: http://localhost:8088
-   - **ClickHouse**: http://localhost:8123
-   - **Glassflow UI**: http://localhost:8080
+8. **Monitor the pipeline**:
+   - **Kafka UI**: http://localhost:8088 - Monitor Kafka topics and messages
+   - **GlassFlow UI**: http://localhost:8080 - Monitor ETL pipeline status
+   - **ClickHouse**: http://localhost:8123 - Query the enriched data
+   - **Grafana Dashboard**: http://localhost:3000 (admin/admin) - Visualize insights
+
+### Data Verification
+
+9. **Verify data flow**:
+   
+   Check Kafka topics have data:
+   ```bash
+   # Access Kafka UI at http://localhost:8088
+   # Or use command line:
+   docker exec -it kafka1 kafka-console-consumer --bootstrap-server localhost:19092 --topic game_streams --from-beginning --max-messages 5
+   ```
+   
+   Query ClickHouse to verify enriched data:
+   ```sql
+   -- Connect to ClickHouse and run:
+   SELECT COUNT(*) FROM default.game_streams_enriched;
+   
+   -- Check recent data:
+   SELECT 
+       game_name, 
+       user_name, 
+       viewer_count, 
+       started_at
+   FROM default.game_streams_enriched 
+   ORDER BY data_retrieved_at DESC 
+   LIMIT 10;
+   ```
+
+### Troubleshooting
+
+**Common Issues:**
+
+- **No data in ClickHouse**: Check GlassFlow pipeline status and logs
+- **Kafka connection issues**: Verify Kafka is running and topics exist
+- **API rate limits**: Check Twitch API credentials and rate limiting
+- **Pipeline errors**: Check GlassFlow logs in the UI
+
+**Useful Commands:**
+```bash
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f kafka1
+docker-compose logs -f clickhouse
+docker-compose logs -f app
+
+# Restart services
+docker-compose restart
+```
 
 ## 📊 Data Schema
 
@@ -157,6 +289,7 @@ TTL toDateTime(started_at) + toIntervalDay(14)
 ```
 ├── docker-compose.yml          # Infrastructure orchestration
 ├── pyproject.toml             # Python dependencies
+├── LICENSE                    # MIT License
 ├── src/
 │   ├── producer/              # Data ingestion
 │   │   ├── streams_producer.py
@@ -169,8 +302,13 @@ TTL toDateTime(started_at) + toIntervalDay(14)
 │   ├── clickhouse/
 │   ├── grafana/
 │   └── nginx/
+├── docs/                      # Documentation
+│   └── glassflow-setup.md     # GlassFlow pipeline setup guide
 ├── data/                      # Persistent data storage
-└── images/                    # Documentation images
+├── images/                    # Documentation images
+│   ├── architecture.png
+│   └── grafana.png
+└── .gitignore                 # Git ignore rules
 ```
 
 ## 🔍 Monitoring and Observability
