@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: http://clickhouse:8123
+    isDefault: true
+    editable: true
+    jsonData:
+      defaultDatabase: twitch_data
+      dialTimeout: 10
+      queryTimeout: 60
+    secureJsonData:
+      username: default
+      password: ""

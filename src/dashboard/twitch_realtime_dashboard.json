@@ -1,0 +1,652 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 2,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cenqggl2xa800f"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#5794f2",
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 11,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cenqggl2xa800f"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.9.0",
+          "queryType": "table",
+          "rawSql": "WITH current_stream_snapshot AS (\r\n    SELECT \r\n        stream_id,\r\n        argMax(viewer_count, data_retrieved_at) as latest_viewer_count,\r\n        argMax(stream_type, data_retrieved_at) as latest_stream_type\r\n    FROM default.game_streams_enriched\r\n    WHERE data_retrieved_at >= now() - INTERVAL 5 MINUTE\r\n    GROUP BY stream_id\r\n    HAVING latest_stream_type = 'live'\r\n)\r\nSELECT sum(ifNull(latest_viewer_count, 0)) as total_viewers\r\nFROM current_stream_snapshot",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Current Viewers",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cenqggl2xa800f"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 13,
+        "x": 11,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "timezone": [
+          "Asia/Ho_Chi_Minh"
+        ],
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cenqggl2xa800f"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.9.0",
+          "queryType": "table",
+          "rawSql": "SELECT \r\n    toStartOfInterval(data_retrieved_at, INTERVAL 1 MINUTE) as time,\r\n    sum(ifNull(viewer_count, 0)) as total_viewers\r\nFROM default.game_streams_enriched\r\nWHERE data_retrieved_at >= toTimeZone(now(), 'Asia/Ho_Chi_Minh') - INTERVAL 10 MINUTE\r\n    AND stream_type = 'live'\r\n    AND game_name IS NOT NULL\r\nGROUP BY time\r\nORDER BY time desc\r\nLIMIT 15;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Games by Total Viewers",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cenqggl2xa800f"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-text"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "game"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 153
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "viewers"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 84
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "streamer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 147
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 11,
+        "x": 0,
+        "y": 6
+      },
+      "id": 3,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "12.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cenqggl2xa800f"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.9.0",
+          "queryType": "table",
+          "rawSql": "WITH current_stream_snapshot AS (\r\n    SELECT \r\n        stream_id,\r\n        argMax(user_name, data_retrieved_at) as latest_user_name,\r\n        argMax(game_name, data_retrieved_at) as latest_game_name,\r\n        argMax(viewer_count, data_retrieved_at) as latest_viewer_count,\r\n        argMax(title, data_retrieved_at) as latest_title,\r\n        argMax(stream_type, data_retrieved_at) as latest_stream_type\r\n    FROM default.game_streams_enriched\r\n    WHERE data_retrieved_at >= now() - INTERVAL 5 MINUTE\r\n    GROUP BY stream_id\r\n)\r\nSELECT \r\n    ifNull(latest_user_name, 'Unknown') as streamer,\r\n    ifNull(latest_game_name, 'Unknown') as game,\r\n    ifNull(latest_viewer_count, 0) as viewers,\r\n    substr(ifNull(latest_title, ''), 1, 50) as title_preview\r\nFROM current_stream_snapshot\r\nWHERE latest_user_name IS NOT NULL\r\nORDER BY latest_viewer_count DESC\r\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Streamer",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cenqggl2xa800f"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 13,
+        "x": 11,
+        "y": 9
+      },
+      "id": 2,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cenqggl2xa800f"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.9.0",
+          "queryType": "table",
+          "rawSql": "WITH current_stream_snapshot AS (\r\n    SELECT \r\n        stream_id,\r\n        argMax(game_name, data_retrieved_at) as latest_game_name,\r\n        argMax(viewer_count, data_retrieved_at) as latest_viewer_count,\r\n        argMax(stream_type, data_retrieved_at) as latest_stream_type\r\n    FROM default.game_streams_enriched\r\n    WHERE data_retrieved_at >= now() - INTERVAL 5 MINUTE\r\n    GROUP BY stream_id\r\n)\r\nSELECT \r\n    ifNull(latest_game_name, 'Unknown') as game_name,\r\n    sum(ifNull(latest_viewer_count, 0)) as total_viewers\r\nFROM current_stream_snapshot\r\nWHERE latest_game_name IS NOT NULL\r\nGROUP BY latest_game_name\r\nORDER BY total_viewers DESC\r\nLIMIT 5",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Games by Total Viewers",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cenqggl2xa800f"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow"
+              },
+              {
+                "color": "light-green",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 11,
+        "x": 0,
+        "y": 13
+      },
+      "id": 5,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cenqggl2xa800f"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.9.0",
+          "queryType": "table",
+          "rawSql": "WITH current_stream_snapshot AS (\r\n    SELECT \r\n        stream_id,\r\n        argMax(tags, data_retrieved_at) as latest_tags,\r\n        argMax(stream_type, data_retrieved_at) as latest_stream_type\r\n    FROM default.game_streams_enriched\r\n    WHERE data_retrieved_at >= now() - INTERVAL 10 MINUTE\r\n    GROUP BY stream_id\r\n    HAVING latest_stream_type = 'live' \r\n), \r\nfiltered_tags AS (\r\n    SELECT \r\n        assumeNotNull(latest_tags) as tags_string\r\n    FROM current_stream_snapshot\r\n    WHERE latest_tags IS NOT NULL \r\n        AND latest_tags != ''\r\n        AND latest_tags != 'null'\r\n),\r\ntag_split AS (\r\n    SELECT \r\n        trimBoth(arrayJoin(splitByChar(',', tags_string))) as tag\r\n    FROM filtered_tags\r\n)\r\nSELECT \r\n    tag,\r\n    count() as tag_count\r\nFROM tag_split\r\nWHERE tag != '' AND tag IS NOT NULL\r\nGROUP BY tag\r\nORDER BY tag_count DESC\r\nLIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Most Popular Tags",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "cenqggl2xa800f"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 13,
+        "x": 11,
+        "y": 19
+      },
+      "id": 4,
+      "options": {
+        "displayLabels": [
+          "name"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [],
+          "fields": "",
+          "limit": 7,
+          "values": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "cenqggl2xa800f"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.9.0",
+          "queryType": "table",
+          "rawSql": "WITH current_stream_snapshot AS (\r\n    SELECT \r\n        stream_id,\r\n        argMax(language, data_retrieved_at) as latest_language,\r\n        argMax(stream_type, data_retrieved_at) as latest_stream_type\r\n    FROM default.game_streams_enriched\r\n    WHERE data_retrieved_at >= now() - INTERVAL 5 MINUTE\r\n    GROUP BY stream_id\r\n)\r\nSELECT \r\n    ifNull(latest_language, 'Unknown') as language,\r\n    count() as stream_count\r\nFROM current_stream_snapshot\r\nGROUP BY latest_language\r\nORDER BY stream_count DESC\r\nLIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Stream Distribution by Language",
+      "type": "piechart"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "cenqggl2xa800f"
+        },
+        "definition": "",
+        "description": "",
+        "name": "selected_game",
+        "options": [],
+        "query": "",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "2025-06-04T10:50:00.000Z",
+    "to": "2025-06-04T11:09:00.000Z"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Twitch Realtime",
+  "uid": "623d6ccc-8c2b-476d-8960-2f8e3abcac57",
+  "version": 1
+}

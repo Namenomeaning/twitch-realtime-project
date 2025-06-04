@@ -7,10 +7,15 @@ requires-python = ">=3.10"
 dependencies = [
     "authlib>=1.5.2",
     "cachetools>=5.5.2",
+    "clickhouse-connect>=0.8.17",
     "confluent-kafka>=2.10.0",
     "dotenv>=0.9.9",
     "fastavro>=1.11.1",
+    "glassflow-clickhouse-etl>=0.2.7",
     "httpx>=0.28.1",
+    "numpy>=2.2.6",
+    "pandas>=1.5.3",
     "pyspark>=3.5.5",
+    "quixstreams>=0.5.7",
     "twitchapi>=4.4.0",
 ]

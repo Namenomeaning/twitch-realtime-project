@@ -1,57 +1,5 @@
 services:
-  spark-master:
-    build:
-      context: ./Docker/Spark
-      dockerfile: Dockerfile
-    ports:
-      - "9090:8080"
-      - "7077:7077"
-    volumes:
-       - ./apps:/opt/spark-apps
-       - ./data:/opt/spark-data
-    environment:
-      - SPARK_LOCAL_IP=spark-master
-      - SPARK_WORKLOAD=master
-  spark-worker-a:
-    build:
-      context: ./Docker/Spark
-      dockerfile: Dockerfile
-    ports:
-      - "9091:8080"
-      - "7000:7000"
-    depends_on:
-      - spark-master
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKER_CORES=1
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_DRIVER_MEMORY=1G
-      - SPARK_EXECUTOR_MEMORY=1G
-      - SPARK_WORKLOAD=worker
-      - SPARK_LOCAL_IP=spark-worker-a
-    volumes:
-       - ./apps:/opt/spark-apps
-       - ./data:/opt/spark-data
-  spark-worker-b:
-    build:
-      context: ./Docker/Spark
-      dockerfile: Dockerfile
-    ports:
-      - "9094:8080"
-      - "7001:7000"
-    depends_on:
-      - spark-master
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKER_CORES=1
-      - SPARK_WORKER_MEMORY=1G
-      - SPARK_DRIVER_MEMORY=1G
-      - SPARK_EXECUTOR_MEMORY=1G
-      - SPARK_WORKLOAD=worker
-      - SPARK_LOCAL_IP=spark-worker-b
-    volumes:
-        - ./apps:/opt/spark-apps
-        - ./data:/opt/spark-data
+  # Zookeeper
   zoo1:
     image: confluentinc/cp-zookeeper:7.8.0
     hostname: zoo1
@@ -62,6 +10,10 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_SERVER_ID: 1
       ZOOKEEPER_SERVERS: zoo1:2888:3888
+    networks:
+      - twitch-network
+    
+  # Kafka Broker
   kafka1:
     image: confluentinc/cp-kafka:7.8.0
     hostname: kafka1
@@ -87,6 +39,9 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     depends_on:
       - zoo1
+    networks:
+      - twitch-network
+  # Kafka Schema Registry
   kafka-schema-registry:
     image: confluentinc/cp-schema-registry:7.8.0
     hostname: kafka-schema-registry
@@ -100,32 +55,118 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: kafka-schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka1:19092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks:
+      - twitch-network
 
+  # Kafka UI
   kafka-ui: 
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
+    hostname: kafka-ui
     ports:
-      - "8080:8080"
+      - "8088:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka1:19092
       KAFKA_CLUSTERS_0_ZOOKEEPER_CONNECT: zoo1:2181
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://kafka-schema-registry:8081
       KAFKA_CLUSTERS_0_REPLICATION_FACTOR: 1
-  # Add this service to your docker-compose.yml
-  spark-submit:
-    build:
-      context: ./Docker/Spark
-      dockerfile: Dockerfile
     depends_on:
-      - spark-master
-      - spark-worker-a
-      - spark-worker-b
-    environment:
-      - SPARK_MASTER=spark://spark-master:7077
-      - SPARK_WORKLOAD=submit
+      - kafka1
+      - kafka-schema-registry
+    networks:
+      - twitch-network
+
+  # ClickHouse Database
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    user: "101:101"
+    container_name: clickhouse
+    hostname: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
     volumes:
-      - ./src/spark:/opt/spark-apps
-      - ./data:/opt/spark-data
-    working_dir: /opt/spark-apps
-    command: tail -f /dev/null  
+      - ./docker/clickhouse/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./docker/clickhouse/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    networks:
+      - twitch-network
+
+  # Grafana for Data Visualization
+  grafana:
+    build:
+      context: ./docker/grafana
+      dockerfile: Dockerfile
+    container_name: grafana
+    hostname: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_SECURITY_DISABLE_GRAVATAR: true
+      GF_ANALYTICS_REPORTING_ENABLED: false
+      GF_ANALYTICS_CHECK_FOR_UPDATES: false
+    volumes:
+      # Persistent data storage
+      - ./data/grafana/data:/var/lib/grafana
+      # Custom dashboards
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # Local backup and exports
+      - ./data/grafana:/backup
+      # Log files
+      - ./data/grafana/logs:/var/log/grafana
+    depends_on:
+      - clickhouse
+    networks:
+      - twitch-network
+  nats:
+    image: nats:alpine
+    ports:
+      - 4222:4222
+    command: --js
+    restart: unless-stopped
+    networks:
+      - twitch-network
+
+  ui:
+    image: glassflow/clickhouse-etl-fe:stable
+    pull_policy: always
+    networks:
+      - twitch-network
+
+  app:
+    image: glassflow/clickhouse-etl-be:stable
+    pull_policy: always
+    depends_on:
+      - nats
+    restart: unless-stopped
+    environment:
+      GLASSFLOW_LOG_FILE_PATH: /tmp/logs/glassflow
+      GLASSFLOW_NATS_SERVER: nats:4222
+    volumes:
+      - ./data/clickhouse-etl-be/logs:/tmp/logs/glassflow
+    networks:
+      - twitch-network
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - 8080:8080
+    depends_on:
+      - ui
+      - app
+    volumes:
+      - ./data/nginx/logs:/logs:ro
+      - ./docker/nginx:/etc/nginx/templates
+    restart: unless-stopped
+    environment:
+      NGINX_ENTRYPOINT_LOCAL_RESOLVERS: true
+    networks:
+      - twitch-network
+
+networks:
+  twitch-network:
+    driver: bridge
+
